@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <title>So sánh phương án</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/csscompare.css') }}">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <style>
+        body {
+            background-color: white;
+        }
+
+        .table td,
+        .table th {
+            vertical-align: middle;
+            text-align: center;
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Special+Elite&display=swap" rel="stylesheet">
+    <style>
+        h3.text-center {
+            font-family: 'Special Elite', cursive;
+            font-size: 40px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container py-4">
+        <h3 class="text-center mb-4">So sánh phương án</h3>
+        <h3 class="text-center mb-4">Hỗ Trợ Lựa Chọn Điện Thoại Tốt Nhất Dựa Vào Thông Số Kĩ Thuật Theo Phương Pháp AHP
+        </h3>
+
+        <div class="d-flex justify-content-between mb-3">
+            <button class="btn btn-outline-primary btn-sm" onclick="addCriterion()">+ Thêm tiêu chí</button>
+            <div>
+                <button class="btn btn-outline-success btn-sm" onclick="addOptionColumn()">+ Thêm phương án</button>
+                <button class="btn btn-outline-danger btn-sm" onclick="removeOptionColumn()">- Xóa phương án</button>
+            </div>
+            <button id="btnHistory" class="btn btn-secondary">Lịch sử</button>
+
+            <div id="historyPopup"
+                style="display:none; position:absolute; top:60px; right:20px; background:#fff; border:1px solid #ccc; box-shadow:0px 2px 10px rgba(0,0,0,0.1); padding:15px; width:300px; z-index:999;">
+                <h5>Lịch sử Ma Trận</h5>
+                <ul id="matrixList" class="list-unstyled mb-0"></ul>
+
+                <h5>Lịch sử Các Phương Án</h5>
+                <ul id="optionList" class="list-unstyled mb-0"></ul>
+
+                <h5>Lịch sử Ma Trận So Sánh Các Phương Án Theo Từng Tiêu chí</h5>
+                <h5>Lịch sử Tổng Điểm Các Phương Án</h5>
+
+            </div>
+        </div>
+
+        <form method="post" action="/result" id="compare-form">
+            <table class="table table-bordered" id="comparison-table">
+                <thead>
+                    <tr id="header-row">
+                        <th>Tiêu chí</th>
+                        <th>Phương án 1</th>
+                        <th>Xóa tiêu chí</th>
+                    </tr>
+                </thead>
+                <tbody id="criteria-body">
+                    <tr>
+                        <td><input type="text" name="criteria[]" class="form-control" placeholder="Ví dụ: Pin" required>
+                        </td>
+                        <td>
+                            <input type="text" name="option1[]" class="form-control" value="1" required min="0"
+                                step="any" oninput="validateInput(this)" onblur="convertFractionToDecimal(this)">
+                        </td>
+
+                        <td><button type="button" class="btn btn-danger btn-sm"
+                                onclick="removeCriterion(this)">X</button></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="mb-3">
+                <label for="excel-file" class="form-label">Nhập dữ liệu từ Excel:</label>
+                <input type="file" class="form-control" id="excel-file" accept=".xlsx, .xls">
+            </div>
+
+            <div class="text-center">
+                <button type="submit" class="btn btn-success" id="submit-btn">Tính toán</button>
+            </div>
+            <br><br>
+        </form>
+
+        <h1>AI Dự Báo Trước Khi Tính AHP</h1>
+        <form action="/dudoanai" method="post" enctype="multipart/form-data">
+            <label for="file">Chọn file Excel:</label>
+            <input type="file" id="file" name="file" accept=".xlsx" required>
+            <br><br>
+            <button type="submit">Dự đoán</button>
+        </form>
+
+        {% if result %}
+        <h2>Phương án tốt nhất nằm ở dòng: {{ best_row }}</h2>
+        <pre>{{ result }}</pre>
+        {% endif %}
+
+        <h2><br>📌 1.Hướng dẫn để hiểu về ma trận so sánh cặp đôi </br></h2>
+        <p>Giả sử bạn có <strong>n tiêu chí</strong> (hoặc phương án), bạn sẽ tạo ra một <strong>ma trận vuông n x
+                n</strong> để so sánh từng cặp tiêu chí với nhau.</p>
+        <p>Ví dụ với 3 tiêu chí: C1, C2, C3 → tạo ma trận 3x3 như sau:</p>
+
+        <table>
+            <tr>
+                <th></th>
+                <th>C1</th>
+                <th>C2</th>
+                <th>C3</th>
+            </tr>
+            <tr>
+                <th>C1</th>
+                <td>1</td>
+                <td>?</td>
+                <td>?</td>
+            </tr>
+            <tr>
+                <th>C2</th>
+                <td>?</td>
+                <td>1</td>
+                <td>?</td>
+            </tr>
+            <tr>
+                <th>C3</th>
+                <td>?</td>
+                <td>?</td>
+                <td>1</td>
+            </tr>
+        </table>
+
+        <h2>📌 2. Quy tắc điền giá trị</h2>
+        <p>AHP dùng <strong>thang đo từ 1 đến 9</strong> (theo Saaty):</p>
+
+        <table>
+            <tr>
+                <th>Giá trị</th>
+                <th>Ý nghĩa</th>
+            </tr>
+            <tr>
+                <td>1</td>
+                <td>Hai tiêu chí quan trọng như nhau</td>
+            </tr>
+            <tr>
+                <td>3</td>
+                <td>Một tiêu chí hơi quan trọng hơn tiêu chí kia</td>
+            </tr>
+            <tr>
+                <td>5</td>
+                <td>Quan trọng hơn rõ rệt</td>
+            </tr>
+            <tr>
+                <td>7</td>
+                <td>Rất quan trọng</td>
+            </tr>
+            <tr>
+                <td>9</td>
+                <td>Cực kỳ quan trọng</td>
+            </tr>
+            <tr>
+                <td>2,4,6,8</td>
+                <td>Các mức trung gian giữa các mức trên</td>
+            </tr>
+            <tr>
+                <td>1/x</td>
+                <td>Nếu tiêu chí hàng <i>kém hơn</i> cột, dùng nghịch đảo</td>
+            </tr>
+        </table>
+
+        <div class="note">
+            <strong>Lưu ý:</strong> Đường chéo chính luôn là 1 (so với chính nó).<br>
+            Nếu bạn điền giá trị <code>a<sub>ij</sub></code> ở hàng i, cột j → thì ô đối xymmetrical là
+            <code>a<sub>ji</sub> = 1 / a<sub>ij</sub></code>
+        </div>
+
+        <h2>📌 3. Ví dụ cụ thể</h2>
+        <p>Giả sử bạn có 3 tiêu chí:</p>
+        <ul>
+            <li><strong>C1:</strong> Giá cả</li>
+            <li><strong>C2:</strong> Chất lượng</li>
+            <li><strong>C3:</strong> Dịch vụ</li>
+        </ul>
+        <p>Bạn đánh giá:</p>
+        <ul>
+            <li><strong>C1 so với C2:</strong> Chất lượng quan trọng hơn giá cả một chút → C1 vs C2 = 1/3</li>
+            <li><strong>C1 so với C3:</strong> Giá cả và dịch vụ quan trọng như nhau → C1 vs C3 = 1</li>
+            <li><strong>C2 so với C3:</strong> Chất lượng quan trọng hơn dịch vụ rõ rệt → C2 vs C3 = 5</li>
+        </ul>
+
+        <p>⇒ Ma trận so sánh cặp đôi là:</p>
+
+        <table>
+            <tr>
+                <th></th>
+                <th>C1</th>
+                <th>C2</th>
+                <th>C3</th>
+            </tr>
+            <tr>
+                <th>C1</th>
+                <td>1</td>
+                <td>1/3</td>
+                <td>1</td>
+            </tr>
+            <tr>
+                <th>C2</th>
+                <td>3</td>
+                <td>1</td>
+                <td>5</td>
+            </tr>
+            <tr>
+                <th>C3</th>
+                <td>1</td>
+                <td>1/5</td>
+                <td>1</td>
+            </tr>
+        </table>
+    </div>
+
+    <script>
+        let optionCount = 1;
+
+        // Danh sách giá trị hợp lệ (bao gồm phân số và số thập phân tương ứng)
+        const validValues = [
+            1 / 9, 1 / 8, 1 / 7, 1 / 6, 1 / 5, 1 / 4, 1 / 3, 1 / 2,
+            1, 2, 3, 4, 5, 6, 7, 8, 9
+        ].map(val => parseFloat(val.toFixed(4)));
+
+        function validateInput(input) {
+            let value = input.value.trim();
+            let numericValue;
+
+            // Bỏ qua kiểm tra nếu giá trị chưa hoàn chỉnh (ví dụ: "1/")
+            if (value.endsWith('/')) {
+                return true; // Chưa nhập xong mẫu số, không báo lỗi
+            }
+
+            // Xử lý nếu là phân số (định dạng a/b)
+            if (value.includes('/')) {
+                const [numerator, denominator] = value.split('/').map(Number);
+                if (denominator === 0 || isNaN(numerator) || isNaN(denominator)) {
+                    alert('Phân số không hợp lệ! Vui lòng nhập định dạng a/b (ví dụ: 1/9) với mẫu số khác 0.');
+                    input.value = '';
+                    input.focus();
+                    return false;
+                }
+                numericValue = numerator / denominator; // Không làm tròn ngay
+            } else {
+                // Kiểm tra nếu có chữ (không phải số)
+                if (isNaN(parseFloat(value)) && value !== '') {
+                    alert('Giá trị không hợp lệ! Không được nhập chữ, chỉ nhập số hoặc phân số (ví dụ: 1/2).');
+                    input.value = '';
+                    input.focus();
+                    return false;
+                }
+                numericValue = parseFloat(value);
+                if (isNaN(numericValue)) {
+                    return true; // Cho phép nhập số không hợp lệ tạm thời, sẽ kiểm tra khi blur
+                }
+            }
+
+            // Kiểm tra giá trị phải lớn hơn 0 và trong phạm vi từ 1/9 đến 10
+            if (numericValue <= 0 || numericValue < (1 / 10) || numericValue > 10) {
+                alert('Giá trị không hợp lệ! Vui lòng nhập giá trị từ 1/9, 1/8, 1/7, 1/6, 1/5, 1/4, 1/3, 1/2, 1, 2, 3, 4, 5, 6, 7, 8, 9');
+                input.value = '';
+                input.focus();
+                return false;
+            }
+
+            // Kiểm tra giá trị có nằm trong danh sách hợp lệ không
+            const roundedValue = parseFloat(numericValue.toFixed(4));
+            if (!validValues.includes(roundedValue)) {
+                alert('Giá trị không hợp lệ! Chỉ được nhập: 1/9, 1/8, 1/7, 1/6, 1/5, 1/4, 1/3, 1/2, 1, 2, 3, 4, 5, 6, 7, 8, 9.');
+                input.value = '';
+                input.focus();
+                return false;
+            }
+
+            return true; // Không gán lại value, để convertFractionToDecimal xử lý
+        }
+
+        function addCriterion() {
+            const tbody = document.getElementById("criteria-body");
+            const currentCriteriaCount = tbody.querySelectorAll("tr").length;
+
+            if (currentCriteriaCount >= optionCount) {
+                alert(`Không thể thêm tiêu chí! Số tiêu chí tối đa bằng số phương án (${optionCount}).`);
+                return;
+            }
+
+            const row = document.createElement("tr");
+            const rowIndex = currentCriteriaCount + 1;
+
+            let rowHtml = `<td><input type="text" name="criteria[]" class="form-control" placeholder="Nhập tiêu chí" required></td>`;
+            for (let i = 1; i <= optionCount; i++) {
+                const isDiagonal = i === rowIndex;
+                rowHtml += `<td><input type="text" name="option${i}[]" class="form-control" value="${isDiagonal ? '1' : ''}" ${isDiagonal ? 'readonly' : ''} required oninput="validateInput(this)" onblur="convertFractionToDecimal(this)"></td>`;
+            }
+            rowHtml += `<td><button type="button" class="btn btn-danger btn-sm" onclick="removeCriterion(this)">X</button></td>`;
+            row.innerHTML = rowHtml;
+
+            tbody.appendChild(row);
+            updateHeaderFromCriteria();
+            addSymmetryListeners();
+        }
+
+        function removeCriterion(button) {
+            const row = button.closest("tr");
+            row.remove();
+            updateHeaderFromCriteria();
+            addSymmetryListeners();
+        }
+
+        function addOptionColumn() {
+            optionCount++;
+            const headerRow = document.getElementById("header-row");
+
+            const newHeader = document.createElement("th");
+            newHeader.textContent = `Phương án ${optionCount}`;
+            headerRow.insertBefore(newHeader, headerRow.lastElementChild);
+
+            const rows = document.querySelectorAll("#criteria-body tr");
+            rows.forEach((row, index) => {
+                const newCell = document.createElement("td");
+                const isDiagonal = optionCount === index + 1;
+                newCell.innerHTML = `<input type="text" name="option${optionCount}[]" class="form-control" value="${isDiagonal ? '1' : ''}" ${isDiagonal ? 'readonly' : ''} required oninput="validateInput(this)" onblur="convertFractionToDecimal(this)">`;
+                row.insertBefore(newCell, row.lastElementChild);
+            });
+
+            updateHeaderFromCriteria();
+            addSymmetryListeners();
+        }
+
+        function removeOptionColumn() {
+            if (optionCount === 1) {
+                alert("Phải có ít nhất 1 phương án!");
+                return;
+            }
+
+            const headerRow = document.getElementById("header-row");
+            headerRow.removeChild(headerRow.children[optionCount]);
+
+            const rows = document.querySelectorAll("#criteria-body tr");
+            rows.forEach(row => {
+                row.removeChild(row.children[optionCount]);
+            });
+
+            optionCount--;
+            addSymmetryListeners();
+        }
+
+        function updateHeaderFromCriteria() {
+            const rows = document.querySelectorAll("#criteria-body tr");
+            const headers = document.querySelectorAll("#header-row th");
+
+            rows.forEach((row, index) => {
+                const input = row.querySelector('input[name="criteria[]"]');
+                input.addEventListener("input", () => {
+                    const value = input.value.trim();
+                    if (headers[index + 1]) {
+                        headers[index + 1].textContent = value !== "" ? value : `Phương án ${index + 1}`;
+                    }
+                });
+                input.dispatchEvent(new Event("input"));
+            });
+        }
+
+        function addSymmetryListeners() {
+            const rows = document.querySelectorAll("#criteria-body tr");
+
+            rows.forEach((row, rowIndex) => {
+                const inputs = row.querySelectorAll('input[type="text"]');
+                inputs.forEach((input, colIndex) => {
+                    if (!input.hasAttribute("readonly")) {
+                        input.removeEventListener("input", handleSymmetricInput);
+                        input.addEventListener("input", handleSymmetricInput);
+                    }
+                });
+            });
+        }
+
+        function handleSymmetricInput(event) {
+            const input = event.target;
+            const row = input.closest("tr");
+            const rowIndex = Array.from(row.parentNode.children).indexOf(row); // Chỉ số hàng (0-based)
+            const colIndex = Array.from(row.querySelectorAll('input[type="text"]')).indexOf(input); // Chỉ số cột (0-based, bao gồm cột tiêu chí)
+            let value = input.value.trim();
+            let numericValue;
+
+            // Bỏ qua nếu giá trị chưa hoàn chỉnh (ví dụ: "1/")
+            if (value.endsWith('/')) {
+                return;
+            }
+
+            // Xử lý phân số hoặc số thực
+            let isFraction = false;
+            let numerator, denominator;
+            if (value.includes('/')) {
+                [numerator, denominator] = value.split('/').map(Number);
+                if (denominator === 0 || isNaN(numerator) || isNaN(denominator)) {
+                    alert('Phân số không hợp lệ! Vui lòng nhập định dạng a/b (ví dụ: 1/9) với mẫu số khác 0.');
+                    input.value = '';
+                    return;
+                }
+                numericValue = parseFloat((numerator / denominator).toFixed(4));
+                isFraction = true;
+            } else {
+                numericValue = parseFloat(value);
+            }
+
+            // Kiểm tra hợp lệ trước khi tính đối xứng
+            if (isNaN(numericValue) || numericValue <= 0 || !validateInput(input)) {
+                return;
+            }
+
+            if (numericValue > 0 && colIndex > 0) { // Bỏ qua cột tiêu chí (colIndex = 0)
+                const symmetricRowIndex = colIndex - 1; // Chỉ số hàng đối xứng (0-based)
+                const symmetricColIndex = rowIndex + 1; // Chỉ số cột đối xứng
+                const symmetricRow = document.querySelectorAll("#criteria-body tr")[symmetricRowIndex];
+                if (symmetricRow) {
+                    const symmetricInputs = symmetricRow.querySelectorAll('input[type="text"]');
+                    if (symmetricColIndex < symmetricInputs.length && !symmetricInputs[symmetricColIndex].hasAttribute("readonly")) {
+                        let symmetricValue;
+                        if (isFraction) {
+                            // Nếu giá trị ban đầu là phân số, tính nghịch đảo trực tiếp từ tử và mẫu
+                            symmetricValue = denominator / numerator;
+                        } else {
+                            // Tính nghịch đảo và tìm giá trị gần nhất trong validValues
+                            symmetricValue = 1 / numericValue;
+                            // Tìm giá trị gần nhất trong validValues
+                            symmetricValue = validValues.reduce((prev, curr) =>
+                                Math.abs(curr - symmetricValue) < Math.abs(prev - symmetricValue) ? curr : prev
+                            );
+                        }
+                        symmetricInputs[symmetricColIndex].value = symmetricValue.toString(); // Gán giá trị chính xác
+                        validateInput(symmetricInputs[symmetricColIndex]);
+                        console.log(`Updated symmetric at [${symmetricRowIndex + 1}, ${symmetricColIndex + 1}] with value: ${symmetricInputs[symmetricColIndex].value}`);
+                    }
+                }
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            updateHeaderFromCriteria();
+            addSymmetryListeners();
+        });
+
+        document.getElementById("excel-file").addEventListener("change", function (e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: "array" });
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+                importExcelData(jsonData);
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        function importExcelData(data) {
+            if (data.length < 2) {
+                alert("File Excel không có dữ liệu hợp lệ!");
+                return;
+            }
+
+            const headers = data[0];
+            optionCount = headers.length - 1;
+
+            const headerRow = document.getElementById("header-row");
+            headerRow.innerHTML = `<th>Tiêu chí</th>`;
+            for (let i = 1; i < headers.length; i++) {
+                headerRow.innerHTML += `<th>${headers[i]}</th>`;
+            }
+            headerRow.innerHTML += `<th>Xóa tiêu chí</th>`;
+
+            document.getElementById("criteria-body").innerHTML = "";
+
+            for (let i = 1; i < data.length; i++) {
+                const row = document.createElement("tr");
+                const rowData = data[i];
+
+                let rowHtml = `<td><input type="text" name="criteria[]" class="form-control" value="${rowData[0] || ''}" required></td>`;
+                for (let j = 1; j <= optionCount; j++) {
+                    let value = rowData[j];
+                    const isDiagonal = j === i;
+                    if (isDiagonal) {
+                        value = 1;
+                    } else if (!isNaN(value) && value !== null && value !== '') {
+                        value = parseFloat(value).toFixed(4);
+                        if (!validValues.includes(parseFloat(value))) {
+                            alert(`Giá trị ${value} trong file Excel không hợp lệ! Chỉ được nhập: 1/9, 1/8, 1/7, 1/6, 1/5, 1/4, 1/3, 1/2, 1, 2, 3, 4, 5, 6, 7, 8, 9`);
+                            return;
+                        }
+                    }
+
+                    rowHtml += `<td><input type="text" name="option${j}[]" class="form-control" value="${value || ''}" ${isDiagonal ? 'readonly' : ''} required oninput="validateInput(this)" onblur="convertFractionToDecimal(this)"></td>`;
+                }
+
+                rowHtml += `<td><button type="button" class="btn btn-danger btn-sm" onclick="removeCriterion(this)">X</button></td>`;
+                row.innerHTML = rowHtml;
+                document.getElementById("criteria-body").appendChild(row);
+            }
+
+            updateHeaderFromCriteria();
+            addSymmetryListeners();
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <script>
+
+        function convertFractionToDecimal(input) {
+            let value = input.value.trim();
+            if (value.includes('/')) {
+                const [numerator, denominator] = value.split('/').map(Number);
+                if (denominator === 0 || isNaN(numerator) || isNaN(denominator)) {
+                    alert('Phân số không hợp lệ! Vui lòng nhập định dạng a/b (ví dụ: 1/9) với mẫu số khác 0.');
+                    input.value = '';
+                    input.focus();
+                    return;
+                }
+                let decimalValue = numerator / denominator;
+                // Tìm giá trị gần nhất trong validValues
+                decimalValue = validValues.reduce((prev, curr) =>
+                    Math.abs(curr - decimalValue) < Math.abs(prev - decimalValue) ? curr : prev
+                );
+                input.value = decimalValue.toString(); // Chuyển thành số thập phân (ví dụ: 1/3 thành 0.3333)
+            }
+        }
+
+
+        document.addEventListener("DOMContentLoaded", function () {
+            const btn = document.getElementById("btnHistory");
+            const popup = document.getElementById("historyPopup");
+            const matrixList = document.getElementById("matrixList");
+            const optionList = document.getElementById("optionList");
+
+            btn.addEventListener("click", function () {
+                if (popup.style.display === "none") {
+                    // Lấy lịch sử ma trận
+                    fetch('/matrix-history')
+                        .then(response => response.json())
+                        .then(data => {
+                            matrixList.innerHTML = "";
+                            data.forEach(id => {
+                                const li = document.createElement("li");
+                                const link = document.createElement("a");
+                                link.href = `/criteria-matrix?matrix_id=${id}`;
+                                link.textContent = id;
+                                link.style.display = 'block';
+                                link.style.padding = '4px 0';
+                                li.appendChild(link);
+                                matrixList.appendChild(li);
+                            });
+                        });
+
+                    // Lấy lịch sử các phương án
+                    fetch('/option-history')
+                        .then(response => response.json())
+                        .then(data => {
+                            optionList.innerHTML = "";
+                            data.forEach(id => {
+                                const li = document.createElement("li");
+                                const link = document.createElement("a");
+                                link.href = `/criteria-matrix?matrix_id=${id}`;
+                                link.textContent = id;
+                                link.style.display = 'block';
+                                link.style.padding = '4px 0';
+                                li.appendChild(link);
+                                optionList.appendChild(li)
+
+                            });
+                        });
+
+                    popup.style.display = "block";
+                } else {
+                    popup.style.display = "none";
+                }
+            });
+
+            document.addEventListener("click", function (e) {
+                if (!popup.contains(e.target) && e.target !== btn) {
+                    popup.style.display = "none";
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Danh sách Matrix ID</title>
+</head>
+<body>
+    <h2>Danh sách các Matrix ID</h2>
+    <ul>
+        {% for mid in matrix_ids %}
+            <li>
+                <a href="{{ url_for('criteria_matrix', matrix_id=mid) }}">{{ mid }}</a>
+            </li>
+        {% endfor %}
+    </ul>
+</body>
+</html>

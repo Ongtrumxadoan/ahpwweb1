@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AHP Decision System{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <nav class="navbar">
+        <a class="navbar-brand" href="/">
+            <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo" style="
+            height: 130px;
+            margin-right: 554px;
+            margin-bottom: -65px;">
+        </a>
+                <ul class="navbar-nav">
+            <li><a href="/">Trang chủ</a></li>
+            <li><a href="/compare">So sánh</a></li>
+            <li><a href="/history">Lịch sử</a></li>
+            <li><a href="/guide">Hướng dẫn</a></li>
+        </ul>
+    </nav>
+
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+
+</body>
+</html>
